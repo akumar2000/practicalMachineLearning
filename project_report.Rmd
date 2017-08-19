@@ -1,0 +1,139 @@
+---
+title: "Project_report"
+author: "Ashok kumar"
+date: "August 19, 2017"
+output: html_document
+---
+
+## Introduction  
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement â a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.  
+
+In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.  
+
+## Data Preprocessing  
+```{r, cache = T}
+        
+        library(caret)
+        library(rpart)
+        library(rpart.plot)
+        library(randomForest)
+        library(corrplot)
+```
+### Download the data
+```{r, csache = T}
+        #Get the url of the file to be downloaded
+        trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+        #trainFile <- "data/pml-training.csv"
+        #testFile <- "data/pml-testing.csv"
+        
+        if (!file.exists("./data")) {
+                dir.create("./data")
+        }
+
+        #check if file exists or else download from the link
+        if(!file.exists("./data/pml-training.csv")) {
+                download.file(trainUrl, destfile = "./data/pml-training.csv", method = "curl")
+        }
+
+        if(!file.exists("./data/pml-testing.csv")) {
+                download.file(testUrl, destfile = ./data/pml-testing.csv, method = "curl")
+        }
+```        
+### Read the Data
+After downloading the data from the data source, we can read the two csv files into two data frames.
+```{r, cache = T}
+
+        #Read data file
+        data.training <- read.csv("./data/pml-training.csv")
+        data.testing <- read.csv("./data/pml-testing.csv")
+        
+        dim(data.training)
+        dim(data.testing)
+```
+The training data set contains 19622 observations and 160 variables, while the testing data set contains 20 observations and 160 variables. The "classe" variable in the training set is the outcome to predict. 
+
+### Clean the data
+In this step, we will clean the data and get rid of observations with missing values as well as some meaningless variables.
+```{r}
+        #remove columns with data not available
+        data.training <- data.training[, colSums(is.na(data.training)) == 0]
+        data.testing <- data.testing[, colSums(is.na(data.testing)) == 0]
+        
+        classe <- data.training$classe
+        
+        #Remove unwanted columns
+        colRemove <- grepl("^X|timestamp|window", names(data.training))
+        data.training <- data.training[, !colRemove]
+
+        colRemove <- grepl("^X|timestamp|window", names(data.testing))
+        data.testing <- data.testing[, !colRemove]
+        
+        
+        #clean the data which is not numeric
+        data.training <- data.training[, sapply(data.training, is.numeric)]
+        data.testing <- data.testing[, sapply(data.testing, is.numeric)]
+
+        data.training$classe <- classe
+
+```
+Now, the cleaned training data set contains 19622 observations and 53 variables, while the testing data set contains 20 observations and 53 variables. The "classe" variable is still in the cleaned training set.
+
+###Slice the data
+
+```{r, cache = T}
+        #prep data for model training
+        set.seed(22519)
+        inTrain <- createDataPartition(y = data.training$classe, p = 0.7, list = FALSE)
+        data4training <- data.training[inTrain, ]
+        data4testing <- data.training[-inTrain, ]
+
+
+```
+
+
+## Data Modeling
+We fit a predictive model for activity recognition using **Random Forest** algorithm because it automatically selects important variables and is robust to correlated covariates & outliers in general. We will use **5-fold cross validation** when applying the algorithm.
+
+```{r, cache = T}
+        #Data modelling
+        controlRf <- trainControl(method="cv", 5)
+        modelRf <- train(classe ~ ., data = data4training, method = "rf", trControl = controlRf, ntree =250)
+
+ 
+        predictRf <- predict(modelRf, data4testing)
+        confusionMatrix(data4testing$classe, predictRf)
+        
+        accuracy <- postResample(predictRf, data4testing$classe)
+        accuracy
+        oose <- 1 - as.numeric(confusionMatrix(data4testing$classe, predictRf)$overall[1])
+        oose
+
+
+```
+So, the estimated accuracy of the model is 99.42% and the estimated out-of-sample error is 0.58%.
+
+## Predicting for Test Data Set
+Now, we apply the model to the original testing data set downloaded from the data source. We remove the `problem_id` column first.  
+
+```{r, cache = T}
+        result <- predict(modelRf, data.testing[, -length(names(data.testing))])
+        result
+
+```
+## Appendix: Figures
+1. Correlation Matrix Visualization  
+
+```{r, cache = T}
+        corrPlot <- cor(data4training[, -length(names(data4training))])
+        corrplot(corrPlot, method="color")
+
+```
+2. Decision Tree Visualization
+
+```{r, cache = T}
+        treeModel <- rpart(classe ~ ., data=data4training, method="class")
+        prp(treeModel) # fast plot
+
+```
