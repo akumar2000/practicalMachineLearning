@@ -1,5 +1,6 @@
 # practicalMachineLearning assignment
 ## Manifest
-* assignment.R script file
-* project_report.Rmd Project report
-* project_report.html 
+* assignment.R Raw script file used to build 
+* project_report.Rmd Project report containing code figure and description 
+* project_report.html Project report html  
+* Data folder contains the data pml-training.csv and pml-testing.csv  
